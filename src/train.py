@@ -37,7 +37,7 @@ def build_pipeline() -> Pipeline:
     
     return pipeline
 
-def train():
+def train(threshold: float = 0.3):
     """Entrena el modelo y registra el experimento en MLflow."""
     
     # Cargar datos
@@ -66,10 +66,10 @@ def train():
     )
     grid_search.fit(X_train, y_train)
     
-    # Evaluar
+    # Evaluar con threshold
     best_pipeline = grid_search.best_estimator_
-    y_pred = best_pipeline.predict(X_test)
     y_proba = best_pipeline.predict_proba(X_test)[:,1]
+    y_pred = (y_proba >= threshold).astype(int)
     
     auc = roc_auc_score(y_test, y_proba)
     report = classification_report(y_test, y_pred, output_dict=True)
@@ -80,12 +80,14 @@ def train():
     
     with mlflow.start_run(run_name="pipeline_rf_tuned_script"):
         mlflow.log_params(grid_search.best_params_)
+        mlflow.log_param("threshold", threshold)
         mlflow.log_metric("auc_roc", auc)
         mlflow.log_metric("recall_churn", report['1']['recall'])
         mlflow.log_metric("precision_churn", report['1']['precision'])
         mlflow.log_metric("f1_churn", report['1']['f1-score'])
         mlflow.sklearn.log_model(best_pipeline, name="pipeline_rf_churn")
     
+    print(f"Threshold: {threshold}")
     print(f"AUC-ROC: {auc:.3f}")
     print(f"Recall churn: {report['1']['recall']:.3f}")
     print("Entrenamiento completado ✓")
